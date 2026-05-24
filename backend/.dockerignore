@@ -1,0 +1,11 @@
+.venv/
+venv/
+__pycache__/
+*.pyc
+.env
+*.db
+*.sqlite
+output.txt
+_*.txt
+verify_out.txt
+README.md

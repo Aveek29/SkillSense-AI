@@ -1,0 +1,44 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+env/
+
+# Environment files
+.env
+!.env.example
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Logs & output
+*.log
+output.txt
+_*.txt
+verify_out.txt
+
+# Node
+node_modules/
+dist/
+frontend/.env*
+
+# Deployment
+.vercel
+render.yaml
+
+# Uploads
+uploads/
+
+# OS
+.DS_Store
+Thumbs.db

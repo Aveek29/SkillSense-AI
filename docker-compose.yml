@@ -1,0 +1,40 @@
+version: '3.8'
+
+services:
+  postgres_db:
+    image: postgres:16-alpine
+    container_name: postgres_db_cluster
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: devops_user
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres_root_secure_password}
+      POSTGRES_DB: skillsense_unified
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U devops_user -d skillsense_unified"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  unified_api:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: unified_api_server
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=postgresql://devops_user:${POSTGRES_PASSWORD:-postgres_root_secure_password}@postgres_db_cluster:5432/skillsense_unified
+      - GROQ_API_KEY=${GROQ_API_KEY:?GROQ_API_KEY is required}
+      - GEMINI_API_KEY=${GEMINI_API_KEY:-}
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY:?JWT_SECRET_KEY is required}
+      - AES_SECRET_KEY_B64=${AES_SECRET_KEY_B64:-}
+    depends_on:
+      postgres_db:
+        condition: service_healthy
+
+volumes:
+  postgres_data:
+    driver: local
