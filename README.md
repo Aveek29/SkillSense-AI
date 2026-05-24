@@ -6,14 +6,15 @@ Enterprise-grade technical recruiting platform with AI-driven interviews, speech
 
 ```
 skillsense-ai/
-├── frontend/          # React 18 + Vite SPA — deploy on Vercel
-├── backend/           # FastAPI + Python 3.11 — deploy on Render
+├── frontend/          # React 18 
+├── backend/           # FastAPI 
 ├── docs/              # Specifications and blueprints
 ├── scripts/           # Utility and verification scripts
-└── docker-compose.yml # PostgreSQL + API for local dev
+└── docker-compose.yml # PostgreSQL + API for local dev only for local machine
+
 ```
 
-## Quick Start
+## Quick Start for local maachine
 
 ### Backend
 ```bash
