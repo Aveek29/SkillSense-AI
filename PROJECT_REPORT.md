@@ -1,282 +1,384 @@
-# SkillSense AI — Comprehensive Project Report
+# SkillSense AI — Project Report
 
 ## Executive Summary
 
 SkillSense AI is an enterprise-grade unified interview assessment and cloud sandbox optimization platform. It combines **speech analytics**, **NLP-powered resume parsing**, **AI-driven evaluation** (via Groq LLM), **Prophet time-series forecasting**, and **Isolation Forest anomaly detection** into a single coherent system with a modern React frontend.
 
-This report documents the complete audit, bug fixes, and production hardening applied across the entire codebase.
+The platform enables recruiters to conduct AI-graded technical interviews with live speech analysis, provision cloud sandbox environments for candidates, monitor infrastructure costs, and detect anomalies — all from a single interface.
 
 ---
 
-## 1. Project Architecture
+## 1. Project Overview
 
+### 1.1 Purpose
+SkillSense AI addresses the fragmented nature of technical hiring by unifying:
+- Resume screening and skill extraction
+- Live AI-graded interviews with speech analytics
+- Cloud sandbox provisioning for coding assessments
+- FinOps monitoring and cost forecasting
+- Anomaly detection on infrastructure telemetry
+
+### 1.2 Key Features
+| Feature | Description |
+|---------|-------------|
+| AI-Powered Interview Grading | 3-axis scoring (Technical, Communication, Relevance) using Groq LLM |
+| Resume Intelligence | Automated skill extraction using spaCy NER with custom EntityRuler |
+| Speech Analytics | Real-time fluency, pacing, filler-word detection via Librosa DSP |
+| Dynamic Question Generation | Adaptive difficulty based on candidate performance |
+| Cloud Sandbox Provisioning | AWS EC2 instances per interview session with lifecycle management |
+| FinOps Forecasting | Prophet time-series predictions for cloud spending |
+| Anomaly Detection | Isolation Forest on VM CPU/RAM/cost telemetry |
+| Bilingual AI Chat | Hindi/English candidate assistance via Groq |
+| Multi-Theme Design | 5 glass-morphism themes with CSS custom properties |
+
+### 1.3 Target Users
+| User Role | Capabilities |
+|-----------|-------------|
+| Candidate | Upload resume, start interview, respond to questions, view assessment report |
+| Recruiter | View candidate assessments, monitor sandbox VMs, analyze costs, review anomalies |
+| Admin | Manage users, configure interview modes, review system health |
+
+---
+
+## 2. System Architecture
+
+### 2.1 High-Level Architecture
 ```
-SkillSense AI/
-├── backend/                    # FastAPI + SQLAlchemy + Groq LLM
-│   ├── app/
-│   │   ├── core/               # Config, auth, database, utils
-│   │   ├── models/             # SQLAlchemy ORM tables (4 models)
-│   │   ├── routers/            # Auth API endpoints
-│   │   ├── services/           # 7 AI/ML/cloud services
-│   │   └── main.py             # FastAPI entry (15 API routes)
-│   ├── database/               # Seed scripts, SQLite DB
-│   ├── .env                    # Runtime config
-│   ├── requirements.txt        # 24 Python dependencies
-│   └── Dockerfile              # Multi-stage Python 3.11 build
-├── frontend/                   # React 18 + Vite 5
-│   ├── src/
-│   │   ├── views/              # 4 page views
-│   │   ├── components/         # 7 reusable components
-│   │   ├── assets/index.css    # 408-line design system (5 themes)
-│   │   └── App.jsx             # SPA shell with routing
-│   └── vite.config.js          # Proxy to :8000
-├── scripts/                    # Setup, verification, testing
-├── docker-compose.yml          # PostgreSQL 16 + API
-└── .vscode/settings.json       # IDE config
+┌─────────────────────────────────────────────────────────┐
+│                    Frontend (React 18)                   │
+│  PortalView → InterviewConsole → ReportDashboard        │
+│  RecruiterDashboard (FinOps + Anomaly Monitoring)       │
+│  ChatBot (Bilingual Hindi/English)                      │
+│  ThemeSwitcher (5 themes)                               │
+└──────────────────────┬──────────────────────────────────┘
+                       │ Vite Proxy (:3000 → :8000)
+                       ▼
+┌─────────────────────────────────────────────────────────┐
+│                 Backend (FastAPI + Uvicorn)              │
+│  ┌──────────┐  ┌──────────┐  ┌──────────────────────┐  │
+│  │ Auth     │  │ Candidate│  │ Recruiter / FinOps    │  │
+│  │ Router   │  │ Router   │  │ Router                │  │
+│  └────┬─────┘  └────┬─────┘  └──────────┬───────────┘  │
+│       │              │                    │              │
+│  ┌────▼──────────────▼────────────────────▼───────────┐ │
+│  │              Service Layer (7 services)             │ │
+│  │  LLMOrchestratorService (Groq → Gemini → Fallback) │ │
+│  │  EnterpriseResumeParser (spaCy NER)                │ │
+│  │  AudioProcessingEngine (Librosa DSP)               │ │
+│  │  SandboxProvisionerService (AWS EC2 / Mock)        │ │
+│  │  FinOpsForecaster (Prophet)                        │ │
+│  │  CloudResourceAnomalyDetector (Isolation Forest)   │ │
+│  │  MonitoringInsightService (Groq-powered insights)  │ │
+│  └────────────────────┬───────────────────────────────┘ │
+│                       │                                  │
+│  ┌────────────────────▼───────────────────────────────┐ │
+│  │          Data Layer (SQLAlchemy ORM)                │ │
+│  │  users │ interview_sessions │ sandbox_resources     │ │
+│  │        │ sandbox_metrics                           │ │
+│  └────────────────────┬───────────────────────────────┘ │
+└───────────────────────┼─────────────────────────────────┘
+                        ▼
+              ┌─────────────────┐
+              │  SQLite (Dev)   │
+              │  PostgreSQL     │
+              │  (Production)   │
+              └─────────────────┘
 ```
 
-### Tech Stack
+### 2.2 Tech Stack
 | Layer | Technology | Purpose |
 |-------|-----------|---------|
-| Backend | FastAPI + Uvicorn | Async REST API |
-| Database | SQLAlchemy + SQLite/PostgreSQL | ORM + data persistence |
-| Auth | JWT (python-jose) + bcrypt (passlib) | Token-based authentication |
-| LLM Primary | Groq (llama-3.3-70b-versatile) | AI grading, question generation, monitoring |
+| Backend Framework | FastAPI + Uvicorn | Async REST API server |
+| Database ORM | SQLAlchemy | Database-agnostic ORM (SQLite dev / PostgreSQL prod) |
+| Authentication | JWT (python-jose) + bcrypt (passlib) | Token-based auth with role-based access |
+| LLM Primary | Groq (llama-3.3-70b-versatile) | AI grading, question generation, monitoring insights |
 | LLM Fallback | Google Gemini Pro | Secondary LLM provider |
-| NLP | spaCy + EntityRuler | Resume skill extraction (NER) |
-| Audio DSP | Librosa + NumPy | Speech fluency analysis |
-| Forecasting | Facebook Prophet | Time-series cost prediction |
+| NLP | spaCy + EntityRuler | Resume skill extraction via Named Entity Recognition |
+| Audio DSP | Librosa + NumPy | Speech fluency analysis (WPM, pauses, fillers) |
+| Forecasting | Facebook Prophet | Time-series cloud cost prediction |
 | Anomaly Detection | Isolation Forest (scikit-learn) | VM resource anomaly detection |
-| Cloud | boto3 (AWS EC2) | Sandbox provisioning (with mock fallback) |
-| Frontend | React 18 + Vite 5 | SPA with code splitting |
-| Charts | ApexCharts (react-apexcharts) | Radar, bar, area charts |
-| Design | CSS Custom Properties | 5 glass-morphism themes |
+| Cloud Infrastructure | boto3 (AWS EC2) | Sandbox provisioning (with mock fallback) |
+| Frontend Framework | React 18 + Vite 5 | Single-page application |
+| Charts | ApexCharts (react-apexcharts) | Radar, bar, area visualizations |
+| Design System | CSS Custom Properties | 5 glass-morphism themes |
+| Containerization | Docker + docker-compose | Multi-stage builds, PostgreSQL 16 |
 
----
-
-## 2. Files Audited & Modified
-
-### Backend (18 files)
-| File | Status | Changes |
-|------|--------|---------|
-| `app/main.py` | **Fixed** | Auth on submit-answer (401→optional), session-summary & cost-tip auth (→optional), utcnow→timezone-aware, added DATABASE_DIR creation, guest_user role field |
-| `app/core/config.py` | **Fixed** | Default DATABASE_URL: `./skillsense_dev.db` → `./database/skillsense_dev.db` |
-| `app/core/auth.py` | **Fixed** | Removed unused `Request` import, `utcnow()` → `datetime.now(timezone.utc)` |
-| `app/core/database.py` | Verified | SQLite path resolution, pool settings — clean |
-| `app/core/utils.py` | Verified | `clean_json_payload()` LLM response parser — clean |
-| `app/models/tables.py` | **Fixed** | All `default=datetime.datetime.utcnow` → `lambda: datetime.now(timezone.utc)` (4 tables) |
-| `app/routers/auth.py` | **Fixed** | Removed unused `EmailStr` import |
-| `app/services/sandbox_service.py` | **Rewritten** | Production-ready: boto3 credential validation, graceful mock fallback, proper EC2 config (GP3, encryption, metadata options, tags), cost tracking, instance status checking |
-| `app/services/llm_service.py` | **Fixed** | Removed unused `mode_lower` in `_fallback_question_generator`, mode alignment with frontend |
-| `app/services/monitoring_service.py` | **Fixed** | Optional GroqAIService injection to avoid duplicate clients |
-| `app/services/groq_service.py` | Verified | Groq client, fallback chain — clean |
-| `app/services/parser_service.py` | Verified | spaCy + regex fallback — clean |
-| `app/services/audio_service.py` | Verified | Librosa DSP + transcript fallback — clean |
-| `app/services/forecasting_service.py` | Verified | Prophet + math fallback — clean |
-| `app/services/anomaly_service.py` | Verified | Isolation Forest + rule-based fallback — clean |
-| `.env` | **Fixed** | Added `JWT_SECRET_KEY`, `AES_SECRET_KEY_B64`, fixed `DATABASE_URL` |
-| `.env.example` | **Fixed** | Updated `DATABASE_URL` to match restructured path |
-| `app/core/security.py` | **Deleted** | Dead code (never imported anywhere) |
-
-### Frontend (8 files)
-| File | Status | Changes |
-|------|--------|---------|
-| `src/components/ChatBot.jsx` | **Fixed** | `dragging` (undefined) → `draggingRef.current` (React ref) |
-| `src/views/InterviewConsole.jsx` | **Fixed** | Added `Authorization: Bearer` header support from localStorage |
-| `src/views/PortalView.jsx` | **Fixed** | Mode keys aligned with backend: `HR`→`HR & Cultural`, `System Design`→`System Design & Architecture`, `Behavioral`→`Behavioral & Leadership`, `Coding`→`Coding & Algorithms`, `DevOps`→`Hybrid (AI Adaptive)` |
-| `src/views/RecruiterDashboard.jsx` | **Rewritten** | Fetches anomalies from `/api/v1/recruiter/sandbox/anomalies` with mock fallback, dynamic stats, API status indicator |
-| `src/views/ReportDashboard.jsx` | Verified | Charts, averages, question breakdown — clean |
-| `src/App.jsx` | Verified | SPA routing, theme management — clean |
-| `src/components/Button.jsx` | Verified | Memoized button — clean |
-| `src/components/SandboxMetricCard.jsx` | Verified | CPU/RAM meters — clean |
-| `src/components/CostTrendChart.jsx` | Verified | ApexCharts area — clean |
-| `src/components/AudioWaveform.jsx` | Verified | Canvas visualizer — clean |
-| `src/components/WebcamStream.jsx` | Verified | Camera feed — clean |
-| `src/components/ThemeSwitcher.jsx` | Verified | 5-theme dropdown — clean |
-| `src/assets/index.css` | Verified | 408-line design system — clean |
-
-### Scripts (3 files)
-| File | Status | Changes |
-|------|--------|---------|
-| `scripts/verify_system.py` | **Fixed** | Path: `skillsense-ai/backend` → `backend` (flat restructure), removed dead `app.core.security` import check, updated DB path |
-| `scripts/verify_groq_integration.py` | **Fixed** | Same path fixes, DB path updated |
-| `scripts/setup_and_fix.py` | **Fixed** | Same path fixes, DB path updated in `.env` defaults |
-| `scripts/_autotest.py` | Verified | Raw HTTP test — clean |
-
-### Deleted Files
-| File | Reason |
-|------|--------|
-| `backend/app/core/security.py` | Dead code — `SecureCredentialStore` never imported anywhere |
-| `backend/database/schema.sql` | Redundant — SQLAlchemy `Base.metadata.create_all()` handles schema |
-| `frontend/src/hooks/` | Empty directory |
-| `frontend/public/assets/branding/` | Empty directory |
-| `frontend/public/assets/fonts/` | Empty directory |
-| `frontend/dist/` | Build output (should not be in repo) |
-
----
-
-## 3. Critical Bugs Fixed
-
-### 3.1 Authorization 401 Errors (Interview Flow Breaker)
-**Before:** `submit-answer`, `session-summary`, `cost-tip` all required `get_current_user` (JWT mandatory). Frontend never sends auth headers → **every interview answer submission returned 401**.
-
-**After:** All three endpoints use `get_optional_user` — works with or without auth. Frontend's `InterviewConsole.jsx` now sends `Authorization: Bearer` header when a token exists in localStorage.
-
-### 3.2 Undefined `dragging` Variable (ChatBot Crash)
-**Before:** `ChatBot.jsx:139` referenced `dragging` — a variable that doesn't exist. This caused a ReferenceError during drag interactions.
-
-**After:** Changed to `draggingRef.current` — the correct React ref that tracks drag state.
-
-### 3.3 Database Path Mismatch (Startup Crash)
-**Before:** `.env` and `config.py` default pointed to `./skillsense_dev.db` (old flat structure). After restructure, the DB should live in `./database/skillsense_dev.db`.
-
-**After:** Both `.env` and `config.py` updated. `main.py` startup now creates the `database/` directory automatically via `os.makedirs(DATABASE_DIR, exist_ok=True)`.
-
-### 3.4 Deprecated `datetime.utcnow()` (Python 3.12+ Warning)
-**Before:** Used in `auth.py`, `main.py`, `tables.py` (4 model defaults) — deprecated since Python 3.12.
-
-**After:** All replaced with `datetime.now(timezone.utc)` or `lambda: datetime.now(timezone.utc)` for SQLAlchemy defaults.
-
-### 3.5 Frontend-Backend Mode Key Mismatch
-**Before:** Frontend sent `HR`, `System Design`, `Behavioral`, `Coding`, `DevOps`. Backend `INTERVIEW_MODES` expected `HR & Cultural`, `System Design & Architecture`, `Behavioral & Leadership`, `Coding & Algorithms`, `Hybrid (AI Adaptive)`. Mode was stored in DB with inconsistent keys.
-
-**After:** Frontend mode keys aligned exactly with backend `INTERVIEW_MODES` dictionary.
-
-### 3.6 Missing Security Keys in `.env`
-**Before:** `.env` had no `JWT_SECRET_KEY` or `AES_SECRET_KEY_B64`. JWT encoding would fail with empty string.
-
-**After:** Default dev keys added to `.env` with comments to change for production.
-
-### 3.7 Dead Code References in Scripts
-**Before:** All 3 scripts referenced `skillsense-ai/backend` (old nested path), and `verify_system.py` imported `app.core.security` (deleted module).
-
-**After:** All paths updated to flat restructure (`backend/`). Dead import removed.
-
-### 3.8 Sandbox Service Ungraceful AWS Failure
-**Before:** `provision_developer_sandbox` and `terminate_developer_sandbox` raised `RuntimeError` on AWS API failure → 500 error cascade.
-
-**After:** Complete rewrite with: boto3 credential validation on init, graceful mock fallback on any AWS error, proper EC2 config (GP3 EBS, encryption, metadata options, tags), cost tracking, instance status checking.
-
-### 3.9 Duplicate GroqAIService Instances
-**Before:** `MonitoringInsightService` created its own `GroqAIService()` instance. `LLMOrchestratorService` also created one. Two separate clients with separate connection pools.
-
-**After:** `MonitoringInsightService` accepts optional `GroqAIService` injection. `main.py` can share instances if needed.
-
----
-
-## 4. Data Flow Architecture
-
+### 2.3 Project Structure
 ```
-Candidate Portal (PortalView)
+SkillSense AI/
+├── backend/                        # FastAPI application
+│   ├── app/
+│   │   ├── core/
+│   │   │   ├── config.py           # Pydantic Settings (env loading)
+│   │   │   ├── auth.py             # JWT, bcrypt, dependency injection
+│   │   │   ├── database.py         # SQLAlchemy engine & session
+│   │   │   └── utils.py            # LLM JSON response parser
+│   │   ├── models/
+│   │   │   └── tables.py           # 4 ORM models (GUID type support)
+│   │   ├── routers/
+│   │   │   └── auth.py             # Register, login, profile, users
+│   │   ├── services/
+│   │   │   ├── groq_service.py     # Groq LLM client (primary)
+│   │   │   ├── llm_service.py      # Multi-provider orchestrator
+│   │   │   ├── parser_service.py   # spaCy resume parser
+│   │   │   ├── audio_service.py    # Librosa audio DSP
+│   │   │   ├── sandbox_service.py  # AWS EC2 provisioner
+│   │   │   ├── forecasting_service.py  # Prophet forecaster
+│   │   │   ├── anomaly_service.py  # Isolation Forest detector
+│   │   │   └── monitoring_service.py   # Groq monitoring facade
+│   │   └── main.py                 # FastAPI entry (15 API routes)
+│   ├── database/
+│   │   ├── seed_data.py            # Demo data generator
+│   │   └── seed_db.py              # ORM database seeder
+│   ├── .env                        # Runtime configuration
+│   ├── .env.example                # Environment template
+│   ├── requirements.txt            # 24 Python dependencies
+│   └── Dockerfile                  # Multi-stage Python 3.11
+├── frontend/                       # React application
+│   ├── src/
+│   │   ├── views/
+│   │   │   ├── PortalView.jsx      # Landing + candidate form
+│   │   │   ├── InterviewConsole.jsx    # Live interview UI
+│   │   │   ├── RecruiterDashboard.jsx  # Analytics dashboard
+│   │   │   └── ReportDashboard.jsx     # Assessment report
+│   │   ├── components/
+│   │   │   ├── ChatBot.jsx         # Bilingual draggable chat
+│   │   │   ├── Button.jsx          # Memoized button
+│   │   │   ├── AudioWaveform.jsx   # Canvas audio visualizer
+│   │   │   ├── WebcamStream.jsx    # Camera feed
+│   │   │   ├── CostTrendChart.jsx  # ApexCharts area chart
+│   │   │   ├── SandboxMetricCard.jsx   # VM metrics card
+│   │   │   └── ThemeSwitcher.jsx   # 5-theme dropdown
+│   │   ├── assets/index.css        # 408-line design system
+│   │   └── App.jsx                 # SPA shell + routing
+│   ├── package.json                # React 18 + Vite 5
+│   └── vite.config.js              # Proxy to backend :8000
+├── scripts/
+│   ├── setup_and_fix.py            # Environment setup
+│   ├── verify_system.py            # System verification
+│   ├── verify_groq_integration.py  # Groq API integration test
+│   └── _autotest.py                # Raw API test
+├── docker-compose.yml              # PostgreSQL 16 + API
+├── render.yaml                     # Render.com deployment
+└── .vscode/settings.json           # IDE configuration
+```
+
+---
+
+## 3. Data Flow Architecture
+
+### 3.1 Candidate Interview Flow
+```
+PortalView
     │
-    ├─ POST /upload-resume ──► Resume Parser (spaCy NER)
-    │                           ├─ Creates/ fetches DBUser
-    │                           ├─ Creates DBInterviewSession
-    │                           ├─ Provisions Sandbox (EC2 / mock)
-    │                           └─ LLM generates first question
+    ├─ POST /upload-resume
+    │   ├─ EnterpriseResumeParser.parse_resume_document(pdf_bytes)
+    │   │   └─ spaCy NER → candidate_skills list
+    │   ├─ DBUser created/fetched
+    │   ├─ DBInterviewSession created (domain, mode, skills)
+    │   ├─ SandboxProvisionerService.provision_developer_sandbox()
+    │   │   └─ AWS EC2 run_instances / mock fallback
+    │   ├─ DBSandboxResource created
+    │   └─ LLMOrchestratorService.generate_next_question()
+    │       └─ Groq → Gemini → fallback question bank
     │
     └─► InterviewConsole
          │
-         ├─ POST /submit-answer ──► Audio Service (Librosa)
-         │   (every answer)         ├─ Speech fluency metrics
-         │                          ├─ LLM grades response (3-axis)
-         │                          ├─ Appends to history_logs JSON
-         │                          ├─ Auto-terminates sandbox at Q5
-         │                          └─ Returns next question
+         ├─ POST /submit-answer (×5 questions)
+         │   ├─ AudioProcessingEngine.compute_speech_fluency()
+         │   │   └─ Librosa: WPM, pauses, fillers, fluency score
+         │   ├─ LLMOrchestratorService.grade_response()
+         │   │   └─ Groq → Gemini → heuristic 3-axis grading
+         │   ├─ history_logs.append(question, transcript, metrics, grades)
+         │   ├─ Auto-terminates sandbox at Q5
+         │   └─ Returns next_question (adaptive difficulty)
          │
          └─► ReportDashboard
-              ├─ Competency radar (ApexCharts)
-              ├─ Per-question bar chart
-              └─ Detailed analysis cards
+              ├─ Competency radar (5 axes: Tech, Comm, Rel, Fluency, Pace)
+              ├─ Per-question score bar chart
+              └─ Detailed question-by-question analysis
+```
 
-Recruiter Dashboard (RecruiterDashboard)
+### 3.2 Recruiter Analytics Flow
+```
+RecruiterDashboard
     │
-    ├─ POST /recruiter/sandbox/anomalies ──► Isolation Forest
-    │                                        ├─ Rule-based fallback
-    │                                        └─ Groq enriches insights
+    ├─ POST /recruiter/sandbox/anomalies
+    │   ├─ CloudResourceAnomalyDetector.evaluate_resource_telemetry()
+    │   │   └─ Isolation Forest → anomaly scores + labels
+    │   └─ MonitoringInsightService.enrich_anomalies()
+    │       └─ Groq: severity, hypothesis, recommended_action
     │
-    └─ POST /recruiter/sandbox/forecast ──► Prophet
-                                             └─ Time-series projections
+    ├─ POST /recruiter/sandbox/forecast
+    │   └─ FinOpsForecaster.generate_expenditure_predictions()
+    │       └─ Prophet: 30-day daily cost projections
+    │
+    └─ POST /monitoring/cost-tip
+        └─ MonitoringInsightService.cost_optimization_tip()
+            └─ Groq: actionable savings recommendation
+```
 
-AI ChatBot (ChatBot)
-    └─ POST /chat ──► Groq bilingual chat (Hindi/English)
+### 3.3 AI Chat Flow
+```
+ChatBot (Hindi/English)
+    └─ POST /chat
+        ├─ Groq bilingual chat (same language as user)
+        └─ Context-aware (last 10 messages)
 ```
 
 ---
 
-## 5. Graceful Degradation Matrix
+## 4. Service Layer Details
 
-Every service has a real→fallback chain. The system runs fully functional without any external dependencies:
+### 4.1 LLMOrchestratorService
+Multi-provider orchestration with 3-tier fallback:
+1. **Groq** (primary) — llama-3.3-70b-versatile via REST API
+2. **Gemini** (secondary) — gemini-pro via google-generativeai
+3. **Heuristic** (fallback) — domain-specific question bank + keyword scoring
 
-| Service | Real Library | Fallback | Trigger |
-|---------|-------------|----------|---------|
-| LLM Grading | Groq API | Gemini → heuristic keyword scoring | No API key |
-| Question Gen | Groq API | Gemini → domain question bank | No API key |
-| Resume Parsing | spaCy NER | Regex keyword matching | No spaCy model |
-| Audio DSP | Librosa | Transcript-only statistical estimation | No librosa |
-| Forecasting | Facebook Prophet | Linear trend with weekly factors | No prophet |
-| Anomaly Detection | Isolation Forest | Rule-based threshold detection | No scikit-learn |
-| Chat | Groq API | Static offline message | No API key |
-| Sandbox | AWS EC2 (boto3) | Mock instance IDs + cost estimates | No AWS creds |
-| Monitoring | Groq API | Predefined insight templates | No API key |
+**Capabilities:**
+- `generate_next_question()` — Adaptive difficulty based on score history
+- `grade_response()` — 3-axis scoring (Technical, Communication, Relevance)
+- `execute_local_heuristic_grader()` — Keyword-matching fallback grader
+
+### 4.2 EnterpriseResumeParser
+- **Primary:** spaCy NER with custom EntityRuler (25 technical skill patterns)
+- **Fallback:** Regex keyword matching against skill taxonomy
+- **Output:** `{candidate_skills, candidate_email, candidate_phone}`
+
+### 4.3 AudioProcessingEngine
+- **Primary:** Librosa DSP — RMS energy, silence detection, WPM, filler counting
+- **Fallback:** Transcript-only statistical estimation
+- **Metrics:** audio_duration_sec, speaking_rate_wpm, pause_count, filler_words_count, filler_ratio, fluency_score
+
+### 4.4 SandboxProvisionerService
+- **Primary:** AWS EC2 (boto3) — run_instances with encryption, IMDSv2, tags
+- **Fallback:** Mock instance IDs with realistic cost estimates
+- **Features:** Cost tracking, instance status checking, graceful error handling
+
+### 4.5 FinOpsForecaster
+- **Primary:** Facebook Prophet — additive seasonal time-series model
+- **Fallback:** Linear trend with weekly factors + noise
+- **Output:** 30-day daily cost projections with confidence intervals
+
+### 4.6 CloudResourceAnomalyDetector
+- **Primary:** Isolation Forest (contamination=0.05)
+- **Fallback:** Rule-based threshold detection (CPU>85%, RAM>80%, Cost>$15)
+- **Output:** anomaly_score (0-1), is_anomaly boolean per metric
+
+### 4.7 MonitoringInsightService
+Groq-powered insight generation:
+- `session_summary()` — Interview performance summary + hiring recommendation
+- `cost_optimization_tip()` — Actionable savings advice
+- `enrich_anomalies()` — Severity, hypothesis, and remediation for detected anomalies
 
 ---
 
-## 6. Security Summary
+## 5. Database Schema
 
-| Area | Status | Notes |
-|------|--------|-------|
-| JWT Authentication | Implemented | HS256, configurable expiry, role-based access |
-| Password Hashing | Implemented | bcrypt via passlib |
-| CORS | Configurable | Defaults to localhost:3000,5173 |
-| AES-256-GCM | Schema ready | `aws_credential_secret_b64` column on users table |
-| Input Validation | Pydantic schemas | All request bodies validated |
-| File Upload | Size/type check | PDF-only on resume, temp file cleanup |
-| Secrets | `.env` excluded | Added to `.gitignore` pattern |
-| EC2 Security | Hardened | IMDSv2 required, encrypted EBS, tagged instances |
+### 5.1 Entity Relationship
+```
+users (1) ──── (many) interview_sessions
+users (1) ──── (many) sandbox_resources
+interview_sessions (1) ──── (1) sandbox_resources
+sandbox_resources (1) ──── (many) sandbox_metrics
+```
+
+### 5.2 Models
+
+| Model | Key Fields | Purpose |
+|-------|-----------|---------|
+| **DBUser** | id (UUID), name, email, password_hash, role, aws_credential_secret_b64, created_at | User accounts (candidate/recruiter) |
+| **DBInterviewSession** | id (UUID), candidate_id (FK), domain, mode, status, history_logs (JSON), skills (JSON), started_at, completed_at | Interview sessions with AI grading history |
+| **DBSandboxResource** | resource_id (Instance ID PK), user_id (FK), interview_id (FK), provider, instance_tier, region, status, hourly_rate | AWS EC2 sandbox instances |
+| **DBSandboxMetric** | id (auto), resource_id (FK), cpu_utilization, ram_utilization, network_egress_bytes, daily_cost, is_anomaly, anomaly_score, timestamp | Time-series VM telemetry |
+
+### 5.3 Database Support
+- **Development:** SQLite (`database/skillsense_dev.db`) — zero-config
+- **Production:** PostgreSQL 16 via docker-compose — connection pooling (10+20)
+- **ORM:** SQLAlchemy with database-agnostic JSON column (JSONB on PG, TEXT on SQLite)
+- **GUID:** Custom `GUID` type — PostgreSQL UUID or CHAR(36) for SQLite
 
 ---
 
-## 7. Database Schema
+## 6. Authentication & Security
 
-4 SQLAlchemy models with SQLite (dev) / PostgreSQL (production) support:
+### 6.1 Authentication System
+| Component | Implementation |
+|-----------|---------------|
+| Password Hashing | bcrypt via passlib (12 rounds) |
+| JWT Tokens | HS256, configurable expiry (default 60 min) |
+| Role-Based Access | `require_role("recruiter")` dependency |
+| Optional Auth | `get_optional_user` — works with/without token |
+| Required Auth | `get_current_user` — 401 if missing/invalid |
 
-- **users** — UUID PK, name, email, bcrypt hash, role, AES-encrypted AWS creds
-- **interview_sessions** — UUID PK, FK→users, domain, mode, status, JSON history_logs, JSON skills
-- **sandbox_resources** — Instance ID PK, FK→users, FK→sessions, provider, tier, region, status, hourly_rate
-- **sandbox_metrics** — Auto-increment PK, FK→sandbox_resources, CPU/RAM/cost telemetry, Isolation Forest anomaly scores
+### 6.2 Security Measures
+| Area | Implementation |
+|------|---------------|
+| CORS | Configurable origins (default: localhost:3000,5173) |
+| AES-256-GCM | Schema ready for AWS credential encryption |
+| Input Validation | Pydantic schemas on all request bodies |
+| File Upload | PDF-only validation, temp file cleanup after processing |
+| EC2 Hardening | IMDSv2 required, encrypted EBS, tagged instances |
+| Secrets | `.env` file excluded from version control |
+
+### 6.3 API Endpoints
+| Endpoint | Method | Auth | Purpose |
+|----------|--------|------|---------|
+| `/api/v1/health` | GET | None | System health check |
+| `/api/v1/modes` | GET | None | Available interview modes |
+| `/api/v1/auth/register` | POST | None | User registration |
+| `/api/v1/auth/login` | POST | None | User login (returns JWT) |
+| `/api/v1/auth/profile` | GET | Required | User profile |
+| `/api/v1/auth/users` | GET | Recruiter | List all users |
+| `/api/v1/candidate/upload-resume` | POST | Optional | Start interview session |
+| `/api/v1/candidate/submit-answer` | POST | Optional | Submit answer + get next question |
+| `/api/v1/recruiter/sandbox/forecast` | POST | Recruiter | Prophet cost forecast |
+| `/api/v1/recruiter/sandbox/anomalies` | POST | Recruiter | Isolation Forest analysis |
+| `/api/v1/monitoring/session-summary` | POST | Optional | Groq session summary |
+| `/api/v1/monitoring/cost-tip` | POST | Optional | Groq cost optimization tip |
+| `/api/v1/chat` | POST | Optional | Bilingual AI chat |
 
 ---
 
-## 8. Frontend Design System
+## 7. Frontend Design System
 
+### 7.1 Themes
 5 glass-morphism themes via CSS custom properties:
-1. **Slate Dark** (default) — Deep indigo
-2. **Neon Cyberpunk** — Hot pink
-3. **Emerald Horizon** — Forest green
-4. **Sunset Fusion** — Warm orange
-5. **Ocean Mist** — Deep blue
 
-Components use `var(--primary)`, `var(--bg-card)`, `var(--glass-border)` etc. for theme-aware styling. All glass panels use `backdrop-filter: blur()` with semi-transparent backgrounds.
+| Theme | Primary Color | Character |
+|-------|--------------|-----------|
+| Slate Dark (default) | Indigo (#785aff) | Deep, professional |
+| Neon Cyberpunk | Hot Pink (#be185d) | Vibrant, energetic |
+| Emerald Horizon | Forest Green (#047857) | Natural, calm |
+| Sunset Fusion | Warm Orange (#c2410c) | Warm, inviting |
+| Ocean Mist | Deep Blue (#0369a1) | Cool, focused |
+
+### 7.2 Component Library
+| Component | Features |
+|-----------|----------|
+| Button | 3 variants (primary, outline, danger), 3 sizes, icon support, memoized |
+| ChatBot | Draggable, bilingual (Hindi/English), voice input, auto-scroll |
+| AudioWaveform | Canvas-based, real-time visualization, static fallback |
+| WebcamStream | Camera toggle, live indicator, graceful error handling |
+| CostTrendChart | ApexCharts area, gradient fill, dark theme |
+| SandboxMetricCard | CPU/RAM progress bars, anomaly alert banner |
+| ThemeSwitcher | Dropdown with color preview, click-outside dismiss |
+
+### 7.3 Design Principles
+- **Glass morphism:** `backdrop-filter: blur()` with semi-transparent backgrounds
+- **CSS custom properties:** Theme-aware via `var(--primary)`, `var(--bg-card)`, etc.
+- **Responsive:** CSS Grid with `auto-fill` and `minmax` for adaptive layouts
+- **Animations:** `animate-fade-in`, `animate-slide-left`, `pulseGlow` keyframes
+- **Accessibility:** Semantic HTML, ARIA labels, keyboard navigation
 
 ---
 
-## 9. Deployment Options
+## 8. Deployment
 
-| Method | Command | Notes |
-|--------|---------|-------|
-| Local Dev | `cd backend; uvicorn app.main:app --reload --port 8000` | SQLite auto-created |
-| Frontend Dev | `cd frontend; npm run dev` | Port 3000, proxies to :8000 |
-| Docker | `docker-compose up --build` | PostgreSQL 16 + API |
-| Production | Render.com `render.yaml` | Auto-deploy from git |
-
----
-
-## 10. How to Run
-
-### Quick Start
+### 8.1 Local Development
 ```bash
-# 1. Backend
+# Backend
 cd backend
 python -m venv .venv
 .venv\Scripts\activate          # Windows
@@ -284,33 +386,122 @@ pip install -r requirements.txt
 python -m spacy download en_core_web_sm
 uvicorn app.main:app --reload --port 8000
 
-# 2. Frontend
+# Frontend
 cd frontend
 npm install
-npm run dev
-
-# 3. Open http://localhost:3000
+npm run dev                    # Port 3000, proxies to :8000
 ```
 
-### Scripts
+### 8.2 Docker
 ```bash
-python scripts/setup_and_fix.py        # Full environment setup
-python scripts/verify_system.py        # System verification
-python scripts/verify_groq_integration.py  # Groq API integration test
-python scripts/_autotest.py            # Raw API test (requires running server)
+docker-compose up --build      # PostgreSQL 16 + API
 ```
+
+### 8.3 Production (Render.com)
+- `render.yaml` configured for auto-deploy from git
+- PostgreSQL add-on for persistent data
+- Environment variables via Render dashboard
+
+### 8.4 Scripts
+| Script | Purpose |
+|--------|---------|
+| `setup_and_fix.py` | Full environment setup (venv, deps, spaCy model, DB seed) |
+| `verify_system.py` | Comprehensive system verification (8 sections) |
+| `verify_groq_integration.py` | Groq API integration testing (6 steps) |
+| `_autotest.py` | Raw HTTP API test for submit-answer endpoint |
 
 ---
 
-## 11. Changes Summary (This Session)
+## 9. Graceful Degradation
 
-**18 files modified**, **1 file rewritten**, **3 scripts fixed**, **3 files deleted**
+Every service operates with a real→fallback chain. The system runs fully functional without any external API keys or cloud credentials:
 
-| Category | Count | Files |
-|----------|-------|-------|
-| Auth fixes | 4 | main.py, auth.py, routers/auth.py, InterviewConsole.jsx |
-| Path fixes | 4 | config.py, .env, .env.example, 3 scripts |
-| Deprecation fixes | 3 | auth.py, main.py, tables.py |
-| Service hardening | 3 | sandbox_service.py (rewrite), monitoring_service.py, llm_service.py |
-| Frontend fixes | 4 | ChatBot.jsx, InterviewConsole.jsx, PortalView.jsx, RecruiterDashboard.jsx |
-| Dead code removed | 3 | security.py, schema.sql, empty dirs |
+| Service | Primary | Fallback | Trigger |
+|---------|---------|----------|---------|
+| LLM Grading | Groq API | Gemini → heuristic keyword scoring | No API key |
+| Question Generation | Groq API | Gemini → domain question bank | No API key |
+| Resume Parsing | spaCy NER | Regex keyword matching | No spaCy model |
+| Audio DSP | Librosa | Transcript-only statistical estimation | No librosa |
+| Forecasting | Facebook Prophet | Linear trend with weekly factors | No prophet |
+| Anomaly Detection | Isolation Forest | Rule-based threshold detection | No scikit-learn |
+| AI Chat | Groq API | Static offline message | No API key |
+| Cloud Sandbox | AWS EC2 (boto3) | Mock instance IDs + cost estimates | No AWS creds |
+| Monitoring | Groq API | Predefined insight templates | No API key |
+
+---
+
+## 10. Future Scope
+
+### 10.1 Short-Term Enhancements
+| Area | Enhancement | Impact |
+|------|------------|--------|
+| Authentication | Add login/register UI in frontend | Complete auth flow for candidates and recruiters |
+| Real Audio Recording | WebRTC recording with actual audio upload | Replace placeholder blobs with real speech analysis |
+| Session History | Load past interviews from database | Candidates can review previous attempts |
+| Live Telemetry | WebSocket-based sandbox metrics streaming | Real-time CPU/RAM updates on RecruiterDashboard |
+| Export Reports | PDF export of assessment reports | Shareable candidate evaluation documents |
+
+### 10.2 Medium-Term Features
+| Area | Enhancement | Impact |
+|------|------------|--------|
+| Multi-Modal Interviews | Video interview support with facial expression analysis | Richer candidate assessment |
+| Collaborative Scoring | Multiple recruiter reviews per candidate | Reduced bias, consensus hiring |
+| Question Bank API | Dynamic question bank with version control | Scalable, community-contributed questions |
+| Integration Layer | ATS integrations (Greenhouse, Lever, Workday) | Enterprise adoption |
+| Analytics Dashboard | Historical hiring metrics, time-to-hire, success rates | Data-driven recruiting decisions |
+
+### 10.3 Long-Term Vision
+| Area | Enhancement | Impact |
+|------|------------|--------|
+| Adaptive AI Interviewer | Real-time conversation flow (not just Q&A) | Natural interview experience |
+| Skills Graph | Knowledge graph of candidate skills vs job requirements | Precise skill-gap analysis |
+| Global Sandbox | Multi-region AWS/GCP/Azure sandbox provisioning | Low-latency global access |
+| Enterprise SSO | SAML/OIDC integration for enterprise auth | Enterprise security compliance |
+| Mobile App | React Native companion app | Interview on mobile devices |
+| API Marketplace | Public API for third-party integrations | Platform ecosystem |
+
+### 10.4 Infrastructure Improvements
+| Area | Enhancement | Impact |
+|------|------------|--------|
+| Caching Layer | Redis for session data and LLM response caching | Reduced latency, lower API costs |
+| Message Queue | Celery/RabbitMQ for async task processing | Non-blocking grading pipeline |
+| Observability | OpenTelemetry tracing, Prometheus metrics | Production monitoring |
+| CI/CD Pipeline | GitHub Actions for automated testing and deployment | Reliable releases |
+| Load Testing | k6/Locust benchmarks for concurrent interviews | Scalability validation |
+
+---
+
+## 11. Audit Summary
+
+### 11.1 Codebase Statistics
+| Metric | Count |
+|--------|-------|
+| Python files | 26 |
+| JSX components | 13 |
+| CSS design system | 408 lines |
+| API endpoints | 15 |
+| Backend services | 7 |
+| Database models | 4 |
+| Themes | 5 |
+| Dependencies (Python) | 24 |
+| Dependencies (JS) | 8 |
+
+### 11.2 Architecture Quality
+| Aspect | Assessment |
+|--------|-----------|
+| Separation of Concerns | Clean service layer, router layer, and data layer separation |
+| Graceful Degradation | Every service has real→fallback chain; runs without external deps |
+| Type Safety | Pydantic schemas, SQLAlchemy models, TypeScript-like prop patterns |
+| Error Handling | Try/except with fallback at every service boundary |
+| Configuration | Centralized via pydantic-settings, `.env` support |
+| Scalability | Stateless API, PostgreSQL-ready, Docker support |
+
+### 11.3 Known Limitations
+| Limitation | Current State | Recommended Fix |
+|-----------|--------------|-----------------|
+| No login UI | Frontend lacks auth flow | Add login/register views |
+| Placeholder audio | InterviewConsole sends blob placeholder | Implement WebRTC recording |
+| Hardcoded demo data | RecruiterDashboard has mock candidates | Fetch from API endpoints |
+| No rate limiting | API has no request throttling | Add SlowAPI or nginx rate limiting |
+| No API versioning | Single `/api/v1/` prefix | Plan for `/api/v2/` migration path |
+| No logging framework | Basic `print` and `logging` | Structured logging with correlation IDs |
