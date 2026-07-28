@@ -13,10 +13,10 @@ import subprocess
 import importlib
 from pathlib import Path
 
-ROOT_DIR = Path(__file__).parent.resolve()
-BACKEND_DIR = ROOT_DIR / "skillsense-ai" / "backend"
+ROOT_DIR = Path(__file__).parent.parent.resolve()
+BACKEND_DIR = ROOT_DIR / "backend"
 VENV_DIR = BACKEND_DIR / ".venv"
-FRONTEND_DIR = ROOT_DIR / "skillsense-ai" / "frontend"
+FRONTEND_DIR = ROOT_DIR / "frontend"
 
 # Re-run under the correct venv if currently running outside it
 _venv_python = None
@@ -117,7 +117,7 @@ def main():
     modules = [
         ("app.core.config", ["get_settings", "Settings"]),
         ("app.core.database", ["engine", "SessionLocal"]),
-        ("app.core.security", ["SecureCredentialStore"]),
+        ("app.core.auth", ["hash_password", "verify_password", "create_access_token", "get_current_user", "get_optional_user"]),
         ("app.models.tables", ["Base", "DBUser", "DBInterviewSession", "DBSandboxResource", "DBSandboxMetric"]),
         ("app.services.parser_service", ["EnterpriseResumeParser"]),
         ("app.services.audio_service", ["AudioProcessingEngine"]),
@@ -225,12 +225,11 @@ def main():
         session_count = db.query(DBInterviewSession).count()
         sandbox_count = db.query(DBSandboxResource).count()
         metric_count = db.query(DBSandboxMetric).count()
-        # Verify history_logs is not None for any session (defensive check)
         bad_sessions = db.query(DBInterviewSession).filter(DBInterviewSession.history_logs.is_(None)).count()
         if bad_sessions:
             warn(f"{bad_sessions} sessions have NULL history_logs", "Run: python database/seed_db.py")
         db.close()
-        check("SQLite connection", True, f"DB: skillsense_dev.db")
+        check("SQLite connection", True, f"DB: database/skillsense_dev.db")
         check("Users table", True, f"{user_count} records")
         check("Sessions table", True, f"{session_count} records")
         check("Sandbox Resources table", True, f"{sandbox_count} records")
@@ -288,7 +287,7 @@ def main():
         if node_modules.exists():
             check("node_modules installed", True)
         else:
-            warn("node_modules not installed", "Run: cd skillsense-ai/frontend && npm install")
+            warn("node_modules not installed", "Run: cd frontend && npm install")
 
     else:
         check("Frontend directory", False)
@@ -357,8 +356,8 @@ def main():
     print("  SYSTEM VERIFICATION COMPLETE")
     print(f"{'='*60}{Colors.ENDC}")
     print()
-    print(f"  Backend server: uvicorn app.main:app --reload --port 8000")
-    print(f"  Frontend dev  : npm run dev (in skillsense-ai/frontend)")
+    print(f"  Backend server: cd backend && uvicorn app.main:app --reload --port 8000")
+    print(f"  Frontend dev  : cd frontend && npm run dev")
     print(f"  VS Code       : Ctrl+Shift+P -> Python: Select Interpreter")
     print()
 

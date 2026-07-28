@@ -52,7 +52,7 @@ class DBUser(Base):
     password_hash = Column(String(255), nullable=False)
     role = Column(String(20), default="candidate", nullable=False)  # "candidate" or "recruiter"
     aws_credential_secret_b64 = Column(String(500), nullable=True)  # Encrypted with AES-256-GCM
-    created_at = Column(DateTime, default=datetime.datetime.utcnow, nullable=False)
+    created_at = Column(DateTime, default=lambda: datetime.datetime.now(datetime.timezone.utc), nullable=False)
 
     interviews = relationship("DBInterviewSession", back_populates="candidate", cascade="all, delete")
     resources = relationship("DBSandboxResource", back_populates="owner", cascade="all, delete")
@@ -67,7 +67,7 @@ class DBInterviewSession(Base):
     domain = Column(String(100), nullable=False)   # AI/ML, Cloud, Web
     mode = Column(String(50), nullable=False)       # Technical, HR
     status = Column(String(50), default="In-Progress", nullable=False)
-    started_at = Column(DateTime, default=datetime.datetime.utcnow, nullable=False)
+    started_at = Column(DateTime, default=lambda: datetime.datetime.now(datetime.timezone.utc), nullable=False)
     completed_at = Column(DateTime, nullable=True)
 
     # Database-agnostic JSON column (maps to JSONB on PG, TEXT on SQLite)
@@ -90,7 +90,7 @@ class DBSandboxResource(Base):
     region = Column(String(100), default="us-east-1", nullable=False)
     status = Column(String(50), default="running", nullable=False)
     hourly_rate = Column(Numeric(10, 4), default=0.0832, nullable=False)
-    created_at = Column(DateTime, default=datetime.datetime.utcnow, nullable=False)
+    created_at = Column(DateTime, default=lambda: datetime.datetime.now(datetime.timezone.utc), nullable=False)
 
     owner = relationship("DBUser", back_populates="resources")
     interview = relationship("DBInterviewSession", back_populates="sandbox")
@@ -107,7 +107,7 @@ class DBSandboxMetric(Base):
     ram_utilization = Column(Numeric(5, 2), nullable=False)
     network_egress_bytes = Column(Integer, default=0, nullable=False)
     daily_cost = Column(Numeric(10, 2), default=0.00, nullable=False)
-    timestamp = Column(DateTime, default=datetime.datetime.utcnow, nullable=False)
+    timestamp = Column(DateTime, default=lambda: datetime.datetime.now(datetime.timezone.utc), nullable=False)
 
     # Anomaly scoring fields populated by Isolation Forest
     is_anomaly = Column(Boolean, default=False, nullable=False)

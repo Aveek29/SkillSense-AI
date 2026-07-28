@@ -43,27 +43,24 @@ def check_python_version():
 
 def setup_virtual_environment():
     print_step("Configuring Virtual Environment (venv)")
-    
-    # We will prioritize creating or fixing the .venv inside the backend directory
-    root_dir = Path(__file__).parent.resolve()
+
+    root_dir = Path(__file__).parent.parent.resolve()
     venv_paths = [
-        root_dir / "skillsense-ai" / "backend" / ".venv",
+        root_dir / "backend" / ".venv",
         root_dir / ".venv",
         root_dir / "venv",
-        root_dir / "skillsense-ai" / "backend" / "venv"
     ]
-    
+
     active_venv = None
     for vp in venv_paths:
         if vp.exists() and (vp / "Scripts" / "python.exe").exists():
             active_venv = vp
             break
-            
+
     if active_venv:
         print_success(f"Existing virtual environment found at: {active_venv}")
     else:
-        # Create a new venv inside the backend directory as .venv
-        active_venv = root_dir / "skillsense-ai" / "backend" / ".venv"
+        active_venv = root_dir / "backend" / ".venv"
         print_info(f"No active virtual environment found. Creating one at: {active_venv}")
         try:
             subprocess.run([sys.executable, "-m", "venv", str(active_venv)], check=True)
@@ -71,8 +68,7 @@ def setup_virtual_environment():
         except Exception as e:
             print_error(f"Failed to create virtual environment: {e}")
             sys.exit(1)
-            
-    # Find the python and pip executables inside the virtual environment
+
     is_windows = platform.system() == "Windows"
     if is_windows:
         venv_python = active_venv / "Scripts" / "python.exe"
@@ -80,11 +76,11 @@ def setup_virtual_environment():
     else:
         venv_python = active_venv / "bin" / "python"
         venv_pip = active_venv / "bin" / "pip"
-        
+
     if not venv_python.exists():
         print_error(f"Virtual environment python executable not found at {venv_python}")
         sys.exit(1)
-        
+
     return venv_python, venv_pip, active_venv
 
 def upgrade_pip_and_tools(venv_python):
@@ -97,16 +93,15 @@ def upgrade_pip_and_tools(venv_python):
 
 def install_dependencies(venv_python, venv_pip):
     print_step("Installing Package Dependencies")
-    root_dir = Path(__file__).parent.resolve()
-    req_file = root_dir / "skillsense-ai" / "backend" / "requirements.txt"
-    
+    root_dir = Path(__file__).parent.parent.resolve()
+    req_file = root_dir / "backend" / "requirements.txt"
+
     if not req_file.exists():
         print_error(f"Could not find backend requirements.txt at: {req_file}")
         sys.exit(1)
-        
+
     print_info(f"Installing requirements from {req_file}...")
     try:
-        # Run pip install with output directly printed to console
         subprocess.run([str(venv_pip), "install", "-r", str(req_file)], check=True)
         print_success("Dependencies installed successfully.")
     except Exception as e:
@@ -132,17 +127,16 @@ def download_spacy_model(venv_python):
 
 def run_database_seeder(venv_python):
     print_step("Seeding the SQLite Database")
-    root_dir = Path(__file__).parent.resolve()
-    backend_dir = root_dir / "skillsense-ai" / "backend"
+    root_dir = Path(__file__).parent.parent.resolve()
+    backend_dir = root_dir / "backend"
     seeder_script = backend_dir / "database" / "seed_db.py"
-    
+
     if not seeder_script.exists():
         print_warning(f"Seeder script not found at {seeder_script}. Skipping database seeding.")
         return
-        
+
     print_info(f"Running database seeder: {seeder_script}...")
     try:
-        # Run in backend workspace directory context so relative paths like ./skillsense_dev.db work correctly
         subprocess.run([str(venv_python), "database/seed_db.py"], cwd=str(backend_dir), check=True)
         print_success("Local SQLite database initialized and seeded successfully.")
     except Exception as e:
@@ -150,22 +144,21 @@ def run_database_seeder(venv_python):
 
 def validate_python_files():
     print_step("Validating Python Code Integrity (Syntax Compile Check)")
-    root_dir = Path(__file__).parent.resolve()
-    backend_app_dir = root_dir / "skillsense-ai" / "backend" / "app"
-    
+    root_dir = Path(__file__).parent.parent.resolve()
+    backend_app_dir = root_dir / "backend" / "app"
+
     if not backend_app_dir.exists():
         print_warning(f"Backend app folder not found at {backend_app_dir}. Skipping syntax check.")
         return
-        
+
     python_files = list(backend_app_dir.glob("**/*.py"))
     print_info(f"Found {len(python_files)} python source files in app/ directory.")
-    
+
     errors_found = 0
     for pf in python_files:
         try:
             with open(pf, "r", encoding="utf-8") as f:
                 content = f.read()
-            # Compiles content to verify syntax
             compile(content, str(pf), "exec")
         except SyntaxError as se:
             print_error(f"Syntax Error in {pf.relative_to(root_dir)} at line {se.lineno}: {se.msg}")
@@ -173,7 +166,7 @@ def validate_python_files():
         except Exception as e:
             print_error(f"Unable to read or compile {pf.relative_to(root_dir)}: {e}")
             errors_found += 1
-            
+
     if errors_found == 0:
         print_success("All Python source code files compiled and verified with zero syntax errors!")
     else:
@@ -182,11 +175,11 @@ def validate_python_files():
 def create_env_file():
     """Create or update .env file with recommended defaults."""
     print_step("Configuring Environment Variables (.env)")
-    root_dir = Path(__file__).parent.resolve()
-    env_path = root_dir / "skillsense-ai" / "backend" / ".env"
+    root_dir = Path(__file__).parent.parent.resolve()
+    env_path = root_dir / "backend" / ".env"
 
     if env_path.exists():
-        print_info(f"Existing .env found at {env_path} — checking for missing keys...")
+        print_info(f"Existing .env found at {env_path} -- checking for missing keys...")
         with open(env_path, "r") as f:
             content = f.read()
     else:
@@ -194,7 +187,7 @@ def create_env_file():
 
     defaults = {
         "DEBUG": "False",
-        "DATABASE_URL": "sqlite:///./skillsense_dev.db",
+        "DATABASE_URL": "sqlite:///./database/skillsense_dev.db",
         "GROQ_API_KEY": "",
         "GEMINI_API_KEY": "",
     }
@@ -243,7 +236,7 @@ def main():
     print("    SkillSense AI Unified Environment Setup & Diagnostics Engine")
     print("=====================================================================")
     print(f"{Colors.ENDC}")
-    
+
     check_python_version()
     venv_python, venv_pip, active_venv = setup_virtual_environment()
     upgrade_pip_and_tools(venv_python)

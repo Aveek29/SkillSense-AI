@@ -6,11 +6,11 @@ const API_BASE = import.meta.env.VITE_API_URL || '/api/v1'
 
 const MODES = [
   { key: 'Technical', desc: 'Core CS concepts, system design & problem-solving', wpm: '120-160', icon: '\u{2699}\u{FE0F}' },
-  { key: 'HR', desc: 'Soft skills, leadership, conflict resolution', wpm: '140-180', icon: '\u{1F91D}' },
-  { key: 'System Design', desc: 'Architectural thinking & scalability planning', wpm: '110-150', icon: '\u{1F3D7}\u{FE0F}' },
-  { key: 'Behavioral', desc: 'Past experiences, situational responses & culture fit', wpm: '130-170', icon: '\u{1F9D1}\u{200D}\u{1F393}' },
-  { key: 'Coding', desc: 'Algorithmic thinking, code quality & optimization', wpm: '100-140', icon: '\u{2328}\u{FE0F}' },
-  { key: 'DevOps', desc: 'CI/CD knowledge, infrastructure as code & monitoring', wpm: '120-160', icon: '\u{1F310}' },
+  { key: 'HR & Cultural', desc: 'Soft skills, leadership, conflict resolution', wpm: '140-180', icon: '\u{1F91D}' },
+  { key: 'System Design & Architecture', desc: 'Architectural thinking & scalability planning', wpm: '110-150', icon: '\u{1F3D7}\u{FE0F}' },
+  { key: 'Behavioral & Leadership', desc: 'Past experiences, situational responses & culture fit', wpm: '130-170', icon: '\u{1F9D1}\u{200D}\u{1F393}' },
+  { key: 'Coding & Algorithms', desc: 'Algorithmic thinking, code quality & optimization', wpm: '100-140', icon: '\u{2328}\u{FE0F}' },
+  { key: 'Hybrid (AI Adaptive)', desc: 'CI/CD knowledge, infrastructure as code & monitoring', wpm: '120-160', icon: '\u{1F310}' },
 ]
 
 export default function PortalView({ onNavigate }) {

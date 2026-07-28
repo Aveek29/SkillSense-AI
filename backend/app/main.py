@@ -6,7 +6,8 @@ from pydantic import BaseModel
 from typing import List, Optional
 import os
 import uuid
-import datetime
+import datetime as dt
+from datetime import datetime, timezone
 
 
 # Models & Databases
@@ -53,11 +54,13 @@ anomaly_detector = CloudResourceAnomalyDetector()
 monitoring = MonitoringInsightService()
 
 UPLOADS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "uploads")
+DATABASE_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "database")
 
 
 @app.on_event("startup")
 async def startup_init():
     """Initialize database tables, create uploads directory, purge leftover files."""
+    os.makedirs(DATABASE_DIR, exist_ok=True)
     Base.metadata.create_all(bind=engine)
     os.makedirs(UPLOADS_DIR, exist_ok=True)
     for f in os.listdir(UPLOADS_DIR):
@@ -191,7 +194,7 @@ async def submit_answer(
     transcript: str = Form(...),
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
-    current_user: DBUser = Depends(get_current_user),
+    current_user: Optional[DBUser] = Depends(get_optional_user),
 ):
     """
     Submit an audio recording and transcript for a given interview question.
@@ -207,7 +210,7 @@ async def submit_answer(
             parsed_id = uuid.uuid4()
         guest_user = db.query(DBUser).filter(DBUser.email == "guest@fallback.local").first()
         if not guest_user:
-            guest_user = DBUser(id=uuid.uuid4(), name="Guest", email="guest@fallback.local", password_hash="auto")
+            guest_user = DBUser(id=uuid.uuid4(), name="Guest", email="guest@fallback.local", password_hash="auto", role="candidate")
             db.add(guest_user)
             db.commit()
             db.refresh(guest_user)
@@ -268,7 +271,7 @@ async def submit_answer(
         # Check if interview is completed, terminate sandbox
         if len(logs) >= 5:
             session.status = "Completed"
-            session.completed_at = datetime.datetime.utcnow()
+            session.completed_at = datetime.now(timezone.utc)
 
             # Find candidate associated AWS sandbox and terminate it instantly
             sandbox = db.query(DBSandboxResource).filter(DBSandboxResource.interview_id == session.id).first()
@@ -337,7 +340,7 @@ class SummaryRequest(BaseModel):
 @app.post("/api/v1/monitoring/session-summary")
 async def get_session_summary(
     payload: SummaryRequest,
-    current_user: DBUser = Depends(get_current_user),
+    current_user: Optional[DBUser] = Depends(get_optional_user),
 ):
     """Generate a Groq-powered interview session summary with hiring recommendation."""
     try:
@@ -389,7 +392,7 @@ async def ai_chat(
 @app.post("/api/v1/monitoring/cost-tip")
 async def get_cost_tip(
     payload: ForecastRequest,
-    current_user: DBUser = Depends(get_current_user),
+    current_user: Optional[DBUser] = Depends(get_optional_user),
 ):
     """Generate Groq-powered cost optimization tip from forecast data."""
     try:

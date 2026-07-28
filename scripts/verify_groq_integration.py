@@ -36,8 +36,8 @@ def print_banner(title):
     print(f"\n{Colors.BOLD}{Colors.BLUE}=== {title} ==={Colors.ENDC}")
 
 # Add backend directory to sys.path to run internal import diagnostics
-root_dir = Path(__file__).parent.resolve()
-backend_dir = root_dir / "skillsense-ai" / "backend"
+root_dir = Path(__file__).parent.parent.resolve()
+backend_dir = root_dir / "backend"
 if str(backend_dir) not in sys.path:
     sys.path.insert(0, str(backend_dir))
 
@@ -46,7 +46,7 @@ if str(backend_dir) not in sys.path:
 # ─────────────────────────────────────────────────────────────────────────
 def test_dependency_alignment():
     print_banner("1. Dependency & Processing Library Verification")
-    
+
     # Check Groq package availability
     try:
         import groq
@@ -75,26 +75,26 @@ def test_dependency_alignment():
 # ─────────────────────────────────────────────────────────────────────────
 def test_input_data_mapping():
     print_banner("2. Groq Ingestion Schema & Data Input Verification")
-    
+
     try:
         from app.services.audio_service import AudioProcessingEngine
-        
+
         # Test simulated audio variables mapped to Groq inputs
         audio_engine = AudioProcessingEngine()
         mock_transcript = "Basically, we should configure a custom multi-stage Docker build, like, to shrink the final footprint and keep standard configurations stable."
-        
+
         # Compute voice fluency metrics programmatically
         metrics = audio_engine.compute_speech_fluency(None, mock_transcript)
-        
+
         # Assert input keys map properly to the expected schema format
         required_keys = ["speaking_rate_wpm", "pause_count", "filler_words_count", "filler_ratio", "fluency_score"]
         missing_keys = [k for k in required_keys if k not in metrics]
-        
+
         if not missing_keys:
             log_test("Voice DSP Input Alignment", "SUCCESS", f"Audio processing output maps successfully to Groq inputs. Fluency Index: {metrics['fluency_score']}/10")
         else:
             log_test("Voice DSP Input Alignment", "CRITICAL", f"Missing keys in computed metrics: {missing_keys}")
-            
+
     except Exception as e:
         log_test("Voice DSP Input Alignment", "CRITICAL", f"Failed to execute input alignment verification: {str(e)}")
 
@@ -103,11 +103,11 @@ def test_input_data_mapping():
 # ─────────────────────────────────────────────────────────────────────────
 def test_groq_api_connectivity():
     print_banner("3. Groq API Service Authorization & Key Verification")
-    
+
     try:
         from app.services.groq_service import GroqAIService
         ai_service = GroqAIService()
-        
+
         # Verify GROQ_API_KEY configuration
         if ai_service.api_key:
             masked = ai_service.api_key[:6] + "..." + ai_service.api_key[-4:] if len(ai_service.api_key) > 10 else "***"
@@ -129,7 +129,7 @@ def test_groq_api_connectivity():
                 log_test("Live Groq Connection Probe", "CRITICAL", f"Authorization failed during live request: {str(e)}")
         else:
             log_test("Live Groq Connection Probe", "WARNING", "Skipped live ping. API Client is uninitialized (expected in Offline/Simulation mode).")
-            
+
     except Exception as e:
         log_test("API Service Probe", "CRITICAL", f"Failed to initialize Groq services: {str(e)}")
 
@@ -138,23 +138,23 @@ def test_groq_api_connectivity():
 # ─────────────────────────────────────────────────────────────────────────
 def test_output_json_schemas():
     print_banner("4. Groq Output Payload & JSON Schema Alignment")
-    
+
     try:
         from app.services.groq_service import GroqAIService
         ai_service = GroqAIService()
-        
+
         # A. Mock Grading Data Test
         mock_question = "Explain standard database scaling constraints when migrating from local monolithic models to cloud instances."
         mock_transcript = "We can use read replicas to handle high read workloads and sharding to distribute writes."
         mock_metrics = {"speaking_rate_wpm": 130.5, "fluency_score": 8.5}
-        
+
         # Trigger Grading Pipeline
         grades = ai_service.grade_response("Cloud Systems", mock_question, mock_transcript, mock_metrics)
-        
+
         # Assert schema alignment
         grading_keys = ["score_tech", "score_comm", "score_rel", "feedback"]
         missing_grades = [k for k in grading_keys if k not in grades]
-        
+
         if not missing_grades:
             log_test("Grading Output Schema Alignment", "SUCCESS", f"Grades match database structures. Tech Score: {grades['score_tech']}/10")
         else:
@@ -164,12 +164,12 @@ def test_output_json_schemas():
         insight = ai_service.generate_cost_optimization_tip(1400.50, 46.50)
         insight_keys = ["tip", "estimated_savings_pct", "effort"]
         missing_insights = [k for k in insight_keys if k not in insight]
-        
+
         if not missing_insights:
             log_test("FinOps Suggestion Schema Alignment", "SUCCESS", f"FinOps guidelines matched. Estimated Savings: {insight['estimated_savings_pct']}%")
         else:
             log_test("FinOps Suggestion Schema Alignment", "CRITICAL", f"Missing fields in FinOps cost advice output payload: {missing_insights}")
-            
+
     except Exception as e:
         log_test("Output Payload Schema Alignment", "CRITICAL", f"Error validating output schemas: {str(e)}")
 
@@ -178,28 +178,28 @@ def test_output_json_schemas():
 # ─────────────────────────────────────────────────────────────────────────
 def test_database_compatibility():
     print_banner("5. Backend Database Schema Compatibility & Continuous Flow")
-    
-    root_dir = Path(__file__).parent.resolve()
-    db_file = root_dir / "skillsense-ai" / "backend" / "skillsense_dev.db"
-    
+
+    root_dir = Path(__file__).parent.parent.resolve()
+    db_file = root_dir / "backend" / "database" / "skillsense_dev.db"
+
     if not db_file.exists():
         log_test("Local SQLite Schema Check", "WARNING", "skillsense_dev.db does not exist yet. Run setup_env.bat to seed it.")
         return
-        
+
     try:
         conn = sqlite3.connect(db_file)
         cursor = conn.cursor()
-        
+
         # Fetch columns from the database-agnostic interview sessions table
         cursor.execute("PRAGMA table_info(interview_sessions);")
         columns = {col[1]: col[2] for col in cursor.fetchall()}
-        
+
         # Confirm that the history_logs JSON column is present to support nested AI evaluations
         if "history_logs" in columns:
             log_test("Database Field Mappings", "SUCCESS", f"Database contains 'history_logs' field (Type: {columns['history_logs']}) to safely store dynamic AI results.")
         else:
             log_test("Database Field Mappings", "CRITICAL", "Database table 'interview_sessions' does not contain 'history_logs' field!")
-            
+
         conn.close()
     except Exception as e:
         log_test("Database Integration Check", "CRITICAL", f"Database connection error: {str(e)}")
@@ -209,11 +209,11 @@ def test_database_compatibility():
 # ─────────────────────────────────────────────────────────────────────────
 def render_dashboard():
     print_banner("DATA INTEGRATION & CONNECTIVITY REPORT CARD")
-    
+
     success_count = sum(1 for r in report_card if r["status"] == "SUCCESS")
     warning_count = sum(1 for r in report_card if r["status"] == "WARNING")
     critical_count = sum(1 for r in report_card if r["status"] == "CRITICAL")
-    
+
     for r in report_card:
         symbol = ""
         if r["status"] == "SUCCESS":
@@ -222,10 +222,10 @@ def render_dashboard():
             symbol = f"{Colors.WARNING}⚠{Colors.ENDC}"
         elif r["status"] == "CRITICAL":
             symbol = f"{Colors.FAIL}✘{Colors.ENDC}"
-            
+
         pad = " " * (45 - len(r["name"]))
         print(f"  {symbol} {r['name']}{pad}-->  {r['status']}  ({r['details']})")
-        
+
     print(f"\n{Colors.BOLD}----------------------------------------------------------------------")
     print(f" CONTINUOUS DATA FLOW SUMMARY")
     print(f"----------------------------------------------------------------------{Colors.ENDC}")
@@ -233,11 +233,11 @@ def render_dashboard():
     print(f"  Warnings Flagged:            {Colors.WARNING}{Colors.BOLD}{warning_count}{Colors.ENDC}")
     print(f"  Critical Flow Failures:      {Colors.FAIL}{Colors.BOLD}{critical_count}{Colors.ENDC}")
     print(f"----------------------------------------------------------------------")
-    
+
     if critical_count == 0:
-        print(f"\n{Colors.BOLD}{Colors.GREEN}🎉 ALIGNED! The backend data flow is fully continuous. Raw libraries seamlessly connect to Groq AI payloads and SQLite tables!{Colors.ENDC}\n")
+        print(f"\n{Colors.BOLD}{Colors.GREEN}ALIGNED! The backend data flow is fully continuous. Raw libraries seamlessly connect to Groq AI payloads and SQLite tables!{Colors.ENDC}\n")
     else:
-        print(f"\n{Colors.BOLD}{Colors.FAIL}🚨 DISRUPTED: {critical_count} critical failures in the data pipeline must be addressed!{Colors.ENDC}\n")
+        print(f"\n{Colors.BOLD}{Colors.FAIL}DISRUPTED: {critical_count} critical failures in the data pipeline must be addressed!{Colors.ENDC}\n")
 
 def main():
     print(f"{Colors.HEADER}{Colors.BOLD}")
@@ -245,7 +245,7 @@ def main():
     print("      SkillSense AI - Groq & Local Libraries Integration Engine")
     print("=====================================================================")
     print(f"{Colors.ENDC}")
-    
+
     test_dependency_alignment()
     test_input_data_mapping()
     test_groq_api_connectivity()

@@ -134,7 +134,6 @@ OUTPUT SCHEMA:
         domain = domain.lower() if domain else ""
         skills_lower = [s.lower() for s in skills] if skills else []
         asked_count = len(history)
-        mode_lower = mode.lower()
 
         question_bank = {
             "ai": [

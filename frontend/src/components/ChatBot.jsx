@@ -136,7 +136,7 @@ export default function ChatBot() {
             left: `${position.x}px`, top: `${position.y}px`,
             width: '360px', height: '480px', zIndex: 9998,
             display: 'flex', flexDirection: 'column',
-            cursor: dragging ? 'grabbing' : 'default',
+            cursor: draggingRef.current ? 'grabbing' : 'default',
             overflow: 'hidden',
           }}
         >

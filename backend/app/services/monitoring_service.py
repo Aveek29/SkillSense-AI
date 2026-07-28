@@ -1,12 +1,12 @@
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 from app.services.groq_service import GroqAIService
 
 
 class MonitoringInsightService:
     """Groq-powered monitoring insights for FinOps, anomaly analysis, and interview session summaries."""
 
-    def __init__(self):
-        self.groq = GroqAIService()
+    def __init__(self, groq: Optional[GroqAIService] = None):
+        self.groq = groq or GroqAIService()
 
     def analyze_anomaly(self, instance_id: str, metric: str, value: str, score: float) -> Dict[str, Any]:
         return self.groq.analyze_anomaly_insight(instance_id, metric, value, score)

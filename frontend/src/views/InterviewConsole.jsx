@@ -50,8 +50,13 @@ export default function InterviewConsole({ data, onNavigate }) {
       body.append('transcript', transcript)
       body.append('file', new Blob(['placeholder'], { type: 'audio/webm' }), 'answer.webm')
 
+      const headers = {}
+      const token = localStorage.getItem('skillsense-token')
+      if (token) headers['Authorization'] = `Bearer ${token}`
+
       const res = await fetch(`${API_BASE}/candidate/submit-answer`, {
         method: 'POST',
+        headers,
         body,
       })
 

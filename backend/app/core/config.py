@@ -9,7 +9,7 @@ class Settings(BaseSettings):
     """Unified application configuration loaded from environment variables."""
 
     # Database
-    DATABASE_URL: str = "sqlite:///./skillsense_dev.db"
+    DATABASE_URL: str = "sqlite:///./database/skillsense_dev.db"
 
     # Security — set these via environment variables or .env
     AES_SECRET_KEY_B64: str = ""
